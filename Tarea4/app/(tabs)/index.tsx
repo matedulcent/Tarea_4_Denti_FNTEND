@@ -1,6 +1,7 @@
-// app/index.tsx
-import React, { useState } from 'react';
-import { View, Text, Image, TextInput, Pressable, Modal, FlatList, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, Image, TextInput, Pressable, Modal, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { BACKEND_URL } from '../../config';
+
 
 interface Producto {
   id: number;
@@ -11,38 +12,39 @@ interface Producto {
   imageLocal?: any;
 }
 
-const productosData: Producto[] = [
-
-  {
-    id: 2,
-    titulo: 'Lapiz',
-    precio: '$200',
-    descripcion: 'HB Mina.',
-    imageUri: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTMaFT1Ih8BPMEiEU0tvRjzMLPgxAzEbNxHRA&s',
-  },
-  {
-    id: 3,
-    titulo: 'Goma Borrar',
-    precio: '$150',
-    descripcion: 'Dos puntas',
-    imageUri: 'https://acdn-us.mitiendanube.com/stores/001/132/430/products/goma-de-borrar-dos-banderas-214-lapiz-tinta-unidad-e88b462598cd2ab1bb17349533816599-480-0.jpg',
-  },
-];
-
 const Index = () => {
+  const [productos, setProductos] = useState<Producto[]>([]);
   const [filtro, setFiltro] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [productoSeleccionado, setProductoSeleccionado] = useState<Producto | null>(null);
   const [resizeMode, setResizeMode] = useState<'cover' | 'contain' | 'stretch'>('cover');
   const [favoritos, setFavoritos] = useState<number[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const productosFiltrados = productosData.filter((p) =>
-    p.titulo.toLowerCase().includes(filtro.toLowerCase())
+  // 🔹 useEffect para GET /products
+  useEffect(() => {
+    const fetchProductos = async () => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/products`);
+        const data: Producto[] = await response.json();
+        setProductos(data);
+      } catch (error) {
+        console.error('Error al obtener productos:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProductos();
+  }, []);
+
+  const productosFiltrados = productos.filter(p =>
+    (p.titulo ?? '').toLowerCase().includes(filtro.toLowerCase())
   );
 
   const toggleFavorito = (id: number) => {
-    setFavoritos((prev) =>
-      prev.includes(id) ? prev.filter((fid) => fid !== id) : [...prev, id]
+    setFavoritos(prev =>
+      prev.includes(id) ? prev.filter(fid => fid !== id) : [...prev, id]
     );
   };
 
@@ -50,10 +52,7 @@ const Index = () => {
     const esFavorito = favoritos.includes(item.id);
     return (
       <Pressable
-        onPress={() => {
-          setProductoSeleccionado(item);
-          setModalVisible(true);
-        }}
+        onPress={() => { setProductoSeleccionado(item); setModalVisible(true); }}
         onLongPress={() => toggleFavorito(item.id)}
         style={[styles.itemContainer, esFavorito && styles.favorito]}
       >
@@ -69,6 +68,14 @@ const Index = () => {
       </Pressable>
     );
   };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#333" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -103,15 +110,9 @@ const Index = () => {
                 <Text style={styles.modalDescripcion}>{productoSeleccionado.descripcion}</Text>
 
                 <View style={styles.buttonsContainer}>
-                  <Pressable style={styles.resizeButton} onPress={() => setResizeMode('cover')}>
-                    <Text>Cover</Text>
-                  </Pressable>
-                  <Pressable style={styles.resizeButton} onPress={() => setResizeMode('contain')}>
-                    <Text>Contain</Text>
-                  </Pressable>
-                  <Pressable style={styles.resizeButton} onPress={() => setResizeMode('stretch')}>
-                    <Text>Stretch</Text>
-                  </Pressable>
+                  <Pressable style={styles.resizeButton} onPress={() => setResizeMode('cover')}><Text>Cover</Text></Pressable>
+                  <Pressable style={styles.resizeButton} onPress={() => setResizeMode('contain')}><Text>Contain</Text></Pressable>
+                  <Pressable style={styles.resizeButton} onPress={() => setResizeMode('stretch')}><Text>Stretch</Text></Pressable>
                 </View>
 
                 <Pressable style={styles.closeButton} onPress={() => setModalVisible(false)}>
