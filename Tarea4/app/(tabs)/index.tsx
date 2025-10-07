@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TextInput, Pressable, Modal, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Image, TextInput, Pressable, Modal, FlatList, StyleSheet, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { BACKEND_URL } from '../../config';
-
 
 interface Producto {
   id: number;
@@ -21,22 +20,72 @@ const Index = () => {
   const [favoritos, setFavoritos] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 🔹 useEffect para GET /products
-  useEffect(() => {
-    const fetchProductos = async () => {
-      try {
-        const response = await fetch(`${BACKEND_URL}/products`);
-        const data: Producto[] = await response.json();
-        setProductos(data);
-      } catch (error) {
-        console.error('Error al obtener productos:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  // 🧩 Estado para nuevo producto
+  const [nuevoTitulo, setNuevoTitulo] = useState('');
+  const [nuevoPrecio, setNuevoPrecio] = useState('');
+  const [nuevaDescripcion, setNuevaDescripcion] = useState('');
+  const [nuevaImagen, setNuevaImagen] = useState('');
 
+  // 🔹 Obtener productos
+  const fetchProductos = async () => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/products`);
+      const data = await response.json();
+      const productosMapeados: Producto[] = data.map((p: any) => ({
+        id: p.id,
+        titulo: p.title ?? '',
+        precio: `$${p.price}`,
+        descripcion: p.description ?? '',
+        imageUri: p.imageUrl ?? ''
+      }));
+      setProductos(productosMapeados);
+    } catch (error) {
+      console.error('Error al obtener productos:', error);
+      setProductos([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchProductos();
   }, []);
+
+  // 🧩 Función para agregar producto (POST)
+  const agregarProducto = async () => {
+    if (!nuevoTitulo || !nuevoPrecio) {
+      Alert.alert('Error', 'Título y precio son obligatorios');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: nuevoTitulo,
+          description: nuevaDescripcion,
+          price: parseFloat(nuevoPrecio),
+          imageUrl: nuevaImagen,
+        }),
+      });
+
+      if (response.ok) {
+        Alert.alert('Éxito', 'Producto agregado correctamente');
+        setNuevoTitulo('');
+        setNuevoPrecio('');
+        setNuevaDescripcion('');
+        setNuevaImagen('');
+        fetchProductos(); // refresca lista
+      } else {
+        const errorText = await response.text();
+        Alert.alert('Error', `No se pudo agregar el producto: ${errorText}`);
+      }
+    } catch (error) {
+      console.error('Error al agregar producto:', error);
+      Alert.alert('Error', 'No se pudo conectar con el servidor');
+    }
+  };
 
   const productosFiltrados = productos.filter(p =>
     (p.titulo ?? '').toLowerCase().includes(filtro.toLowerCase())
@@ -78,7 +127,10 @@ const Index = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
+      <Text style={styles.tituloApp}>📦 Galería de Productos</Text>
+
+      {/* 🔍 Filtro */}
       <TextInput
         placeholder="Buscar por título..."
         value={filtro}
@@ -86,6 +138,42 @@ const Index = () => {
         style={styles.input}
       />
 
+      {/* 🆕 Formulario para agregar productos */}
+      <View style={styles.formContainer}>
+        <Text style={styles.subtitulo}>Agregar producto nuevo</Text>
+
+        <TextInput
+          placeholder="Título"
+          value={nuevoTitulo}
+          onChangeText={setNuevoTitulo}
+          style={styles.input}
+        />
+        <TextInput
+          placeholder="Precio"
+          value={nuevoPrecio}
+          onChangeText={setNuevoPrecio}
+          keyboardType="numeric"
+          style={styles.input}
+        />
+        <TextInput
+          placeholder="Descripción"
+          value={nuevaDescripcion}
+          onChangeText={setNuevaDescripcion}
+          style={styles.input}
+        />
+        <TextInput
+          placeholder="URL de imagen"
+          value={nuevaImagen}
+          onChangeText={setNuevaImagen}
+          style={styles.input}
+        />
+
+        <Pressable style={styles.addButton} onPress={agregarProducto}>
+          <Text style={styles.addButtonText}>Agregar</Text>
+        </Pressable>
+      </View>
+
+      {/* 🧾 Lista de productos */}
       <FlatList
         data={productosFiltrados}
         renderItem={renderItem}
@@ -93,6 +181,7 @@ const Index = () => {
         contentContainerStyle={styles.lista}
       />
 
+      {/* 🔍 Modal de detalle */}
       <Modal visible={modalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -123,15 +212,16 @@ const Index = () => {
           </View>
         </View>
       </Modal>
-    </View>
+    </ScrollView>
   );
 };
 
 export default Index;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5', paddingTop: 50 },
-  input: { margin: 10, padding: 10, backgroundColor: 'white', borderRadius: 5 },
+  container: { flex: 1, backgroundColor: '#f5f5f5', paddingTop: 40 },
+  tituloApp: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 10 },
+  input: { margin: 8, padding: 10, backgroundColor: 'white', borderRadius: 5 },
   lista: { paddingHorizontal: 10 },
   itemContainer: { flexDirection: 'row', backgroundColor: 'white', marginVertical: 5, padding: 10, borderRadius: 5, alignItems: 'center' },
   itemTextContainer: { flex: 1, marginLeft: 10 },
@@ -140,6 +230,10 @@ const styles = StyleSheet.create({
   itemImage: { width: 60, height: 60, borderRadius: 5 },
   iconoFavorito: { fontSize: 20, marginLeft: 5 },
   favorito: { borderColor: 'red', borderWidth: 1 },
+  formContainer: { backgroundColor: 'white', margin: 10, padding: 15, borderRadius: 10 },
+  subtitulo: { fontSize: 16, fontWeight: 'bold', marginBottom: 5 },
+  addButton: { backgroundColor: '#333', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 10 },
+  addButtonText: { color: 'white', fontWeight: 'bold' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { backgroundColor: 'white', width: '90%', borderRadius: 10, padding: 20, alignItems: 'center' },
   modalImage: { width: 200, height: 200, marginBottom: 10 },
