@@ -1,98 +1,150 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+// app/index.tsx
+import React, { useState } from 'react';
+import { View, Text, Image, TextInput, Pressable, Modal, FlatList, StyleSheet } from 'react-native';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
-
-export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
-
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
-  );
+interface Producto {
+  id: number;
+  titulo: string;
+  precio: string;
+  descripcion: string;
+  imageUri?: string;
+  imageLocal?: any;
 }
 
+const productosData: Producto[] = [
+
+  {
+    id: 2,
+    titulo: 'Lapiz',
+    precio: '$200',
+    descripcion: 'HB Mina.',
+    imageUri: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTMaFT1Ih8BPMEiEU0tvRjzMLPgxAzEbNxHRA&s',
+  },
+  {
+    id: 3,
+    titulo: 'Goma Borrar',
+    precio: '$150',
+    descripcion: 'Dos puntas',
+    imageUri: 'https://acdn-us.mitiendanube.com/stores/001/132/430/products/goma-de-borrar-dos-banderas-214-lapiz-tinta-unidad-e88b462598cd2ab1bb17349533816599-480-0.jpg',
+  },
+];
+
+const Index = () => {
+  const [filtro, setFiltro] = useState('');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [productoSeleccionado, setProductoSeleccionado] = useState<Producto | null>(null);
+  const [resizeMode, setResizeMode] = useState<'cover' | 'contain' | 'stretch'>('cover');
+  const [favoritos, setFavoritos] = useState<number[]>([]);
+
+  const productosFiltrados = productosData.filter((p) =>
+    p.titulo.toLowerCase().includes(filtro.toLowerCase())
+  );
+
+  const toggleFavorito = (id: number) => {
+    setFavoritos((prev) =>
+      prev.includes(id) ? prev.filter((fid) => fid !== id) : [...prev, id]
+    );
+  };
+
+  const renderItem = ({ item }: { item: Producto }) => {
+    const esFavorito = favoritos.includes(item.id);
+    return (
+      <Pressable
+        onPress={() => {
+          setProductoSeleccionado(item);
+          setModalVisible(true);
+        }}
+        onLongPress={() => toggleFavorito(item.id)}
+        style={[styles.itemContainer, esFavorito && styles.favorito]}
+      >
+        <Image
+          source={item.imageLocal ? item.imageLocal : { uri: item.imageUri! }}
+          style={styles.itemImage}
+        />
+        <View style={styles.itemTextContainer}>
+          <Text style={styles.itemTitulo}>{item.titulo}</Text>
+          <Text style={styles.itemPrecio}>{item.precio}</Text>
+        </View>
+        {esFavorito && <Text style={styles.iconoFavorito}>❤️</Text>}
+      </Pressable>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      <TextInput
+        placeholder="Buscar por título..."
+        value={filtro}
+        onChangeText={setFiltro}
+        style={styles.input}
+      />
+
+      <FlatList
+        data={productosFiltrados}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id.toString()}
+        contentContainerStyle={styles.lista}
+      />
+
+      <Modal visible={modalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {productoSeleccionado && (
+              <>
+                <Image
+                  source={
+                    productoSeleccionado.imageLocal
+                      ? productoSeleccionado.imageLocal
+                      : { uri: productoSeleccionado.imageUri! }
+                  }
+                  style={[styles.modalImage, { resizeMode }]}
+                />
+                <Text style={styles.modalTitulo}>{productoSeleccionado.titulo}</Text>
+                <Text style={styles.modalDescripcion}>{productoSeleccionado.descripcion}</Text>
+
+                <View style={styles.buttonsContainer}>
+                  <Pressable style={styles.resizeButton} onPress={() => setResizeMode('cover')}>
+                    <Text>Cover</Text>
+                  </Pressable>
+                  <Pressable style={styles.resizeButton} onPress={() => setResizeMode('contain')}>
+                    <Text>Contain</Text>
+                  </Pressable>
+                  <Pressable style={styles.resizeButton} onPress={() => setResizeMode('stretch')}>
+                    <Text>Stretch</Text>
+                  </Pressable>
+                </View>
+
+                <Pressable style={styles.closeButton} onPress={() => setModalVisible(false)}>
+                  <Text style={{ color: 'white' }}>Cerrar</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+};
+
+export default Index;
+
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
+  container: { flex: 1, backgroundColor: '#f5f5f5', paddingTop: 50 },
+  input: { margin: 10, padding: 10, backgroundColor: 'white', borderRadius: 5 },
+  lista: { paddingHorizontal: 10 },
+  itemContainer: { flexDirection: 'row', backgroundColor: 'white', marginVertical: 5, padding: 10, borderRadius: 5, alignItems: 'center' },
+  itemTextContainer: { flex: 1, marginLeft: 10 },
+  itemTitulo: { fontSize: 16, fontWeight: 'bold' },
+  itemPrecio: { fontSize: 14, color: '#666' },
+  itemImage: { width: 60, height: 60, borderRadius: 5 },
+  iconoFavorito: { fontSize: 20, marginLeft: 5 },
+  favorito: { borderColor: 'red', borderWidth: 1 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { backgroundColor: 'white', width: '90%', borderRadius: 10, padding: 20, alignItems: 'center' },
+  modalImage: { width: 200, height: 200, marginBottom: 10 },
+  modalTitulo: { fontSize: 18, fontWeight: 'bold' },
+  modalDescripcion: { fontSize: 14, textAlign: 'center', marginBottom: 10 },
+  buttonsContainer: { flexDirection: 'row', marginVertical: 10 },
+  resizeButton: { marginHorizontal: 5, padding: 10, backgroundColor: '#eee', borderRadius: 5 },
+  closeButton: { backgroundColor: '#333', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 5 },
 });
