@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TextInput, Pressable, Modal, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Image, TextInput, Pressable, Modal, FlatList, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { BACKEND_URL } from '../../config';
 
 interface Producto {
@@ -20,32 +20,38 @@ const Index = () => {
   const [favoritos, setFavoritos] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 🔹 Fetch productos desde la API y formatear campos
+  // Para agregar producto
+  const [agregarModalVisible, setAgregarModalVisible] = useState(false);
+  const [nuevoTitulo, setNuevoTitulo] = useState('');
+  const [nuevoPrecio, setNuevoPrecio] = useState('');
+  const [nuevaDescripcion, setNuevaDescripcion] = useState('');
+  const [nuevaImageUri, setNuevaImageUri] = useState('');
+
   useEffect(() => {
-    const fetchProductos = async () => {
-      try {
-        const response = await fetch(`${BACKEND_URL}/products`);
-        const dataFromApi = await response.json();
-
-        const formattedData: Producto[] = dataFromApi.map((p: any) => ({
-          id: p.id,
-          titulo: p.title,
-          precio: p.price.toString(),
-          descripcion: p.description,
-          imageUri: p.imageUrl,
-        }));
-
-        console.log('Productos formateados:', formattedData);
-        setProductos(formattedData);
-      } catch (error) {
-        console.error('Error al obtener productos:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchProductos();
   }, []);
+
+  const fetchProductos = async () => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/products`);
+      const dataFromApi = await response.json();
+
+      const formattedData: Producto[] = dataFromApi.map((p: any) => ({
+        id: p.id,
+        titulo: p.title,
+        precio: p.price.toString(),
+        descripcion: p.description,
+        imageUri: p.imageUrl,
+      }));
+
+      console.log('Productos formateados:', formattedData);
+      setProductos(formattedData);
+    } catch (error) {
+      console.error('Error al obtener productos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const productosFiltrados = productos.filter(p =>
     (p.titulo ?? '').toLowerCase().includes(filtro.toLowerCase())
@@ -55,6 +61,54 @@ const Index = () => {
     setFavoritos(prev =>
       prev.includes(id) ? prev.filter(fid => fid !== id) : [...prev, id]
     );
+  };
+
+  const agregarProducto = async () => {
+    if (!nuevoTitulo || !nuevoPrecio || !nuevaDescripcion) {
+      Alert.alert('Error', 'Todos los campos son obligatorios');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: nuevoTitulo,
+          price: parseFloat(nuevoPrecio),
+          description: nuevaDescripcion,
+          imageUrl: nuevaImageUri || undefined,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Error al agregar producto');
+
+      const nuevoProducto = await response.json();
+
+      // Actualizamos la lista
+      setProductos(prev => [
+        ...prev,
+        {
+          id: nuevoProducto.id,
+          titulo: nuevoProducto.title,
+          precio: nuevoProducto.price.toString(),
+          descripcion: nuevoProducto.description,
+          imageUri: nuevoProducto.imageUrl,
+        },
+      ]);
+
+      // Limpiar formulario y cerrar modal
+      setNuevoTitulo('');
+      setNuevoPrecio('');
+      setNuevaDescripcion('');
+      setNuevaImageUri('');
+      setAgregarModalVisible(false);
+
+      Alert.alert('Éxito', 'Producto agregado correctamente');
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'No se pudo agregar el producto');
+    }
   };
 
   const renderItem = ({ item }: { item: Producto }) => {
@@ -103,6 +157,10 @@ const Index = () => {
         style={styles.input}
       />
 
+      <Pressable style={styles.addButton} onPress={() => setAgregarModalVisible(true)}>
+        <Text style={{ color: 'white', fontWeight: 'bold' }}>+ Agregar Producto</Text>
+      </Pressable>
+
       <FlatList
         data={productosFiltrados}
         renderItem={renderItem}
@@ -110,6 +168,7 @@ const Index = () => {
         contentContainerStyle={styles.lista}
       />
 
+      {/* Modal para ver producto */}
       <Modal visible={modalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -144,6 +203,28 @@ const Index = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Modal para agregar producto */}
+      <Modal visible={agregarModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>Agregar Producto</Text>
+
+            <TextInput placeholder="Título" value={nuevoTitulo} onChangeText={setNuevoTitulo} style={styles.input} />
+            <TextInput placeholder="Precio" value={nuevoPrecio} onChangeText={setNuevoPrecio} style={styles.input} keyboardType="numeric" />
+            <TextInput placeholder="Descripción" value={nuevaDescripcion} onChangeText={setNuevaDescripcion} style={styles.input} />
+            <TextInput placeholder="URL Imagen (opcional)" value={nuevaImageUri} onChangeText={setNuevaImageUri} style={styles.input} />
+
+            <Pressable style={styles.addButton} onPress={agregarProducto}>
+              <Text style={{ color: 'white', fontWeight: 'bold' }}>Guardar</Text>
+            </Pressable>
+
+            <Pressable style={[styles.closeButton, { marginTop: 10 }]} onPress={() => setAgregarModalVisible(false)}>
+              <Text style={{ color: 'white' }}>Cancelar</Text>
+            </Pressable>
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -161,7 +242,7 @@ const styles = StyleSheet.create({
   itemImage: { width: 60, height: 60, borderRadius: 5 },
   iconoFavorito: { fontSize: 20, marginLeft: 5 },
   favorito: { borderColor: 'red', borderWidth: 1 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', paddingVertical: 20 },
   modalContent: { backgroundColor: 'white', width: '90%', borderRadius: 10, padding: 20, alignItems: 'center' },
   modalImage: { width: 200, height: 200, marginBottom: 10 },
   modalTitulo: { fontSize: 18, fontWeight: 'bold' },
@@ -169,4 +250,5 @@ const styles = StyleSheet.create({
   buttonsContainer: { flexDirection: 'row', marginVertical: 10 },
   resizeButton: { marginHorizontal: 5, padding: 10, backgroundColor: '#eee', borderRadius: 5 },
   closeButton: { backgroundColor: '#333', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 5 },
+  addButton: { backgroundColor: '#28a745', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 5, alignItems: 'center', marginHorizontal: 10 },
 });
