@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, Image, TextInput, Pressable, Modal, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { BACKEND_URL } from '../../config';
 
-
 interface Producto {
   id: number;
   titulo: string;
@@ -21,13 +20,23 @@ const Index = () => {
   const [favoritos, setFavoritos] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 🔹 useEffect para GET /products
+  // 🔹 Fetch productos desde la API y formatear campos
   useEffect(() => {
     const fetchProductos = async () => {
       try {
         const response = await fetch(`${BACKEND_URL}/products`);
-        const data: Producto[] = await response.json();
-        setProductos(data);
+        const dataFromApi = await response.json();
+
+        const formattedData: Producto[] = dataFromApi.map((p: any) => ({
+          id: p.id,
+          titulo: p.title,
+          precio: p.price.toString(),
+          descripcion: p.description,
+          imageUri: p.imageUrl,
+        }));
+
+        console.log('Productos formateados:', formattedData);
+        setProductos(formattedData);
       } catch (error) {
         console.error('Error al obtener productos:', error);
       } finally {
@@ -50,16 +59,24 @@ const Index = () => {
 
   const renderItem = ({ item }: { item: Producto }) => {
     const esFavorito = favoritos.includes(item.id);
+
+    const imageSource = item.imageLocal
+      ? item.imageLocal
+      : item.imageUri
+        ? { uri: item.imageUri }
+        : null;
+
     return (
       <Pressable
         onPress={() => { setProductoSeleccionado(item); setModalVisible(true); }}
         onLongPress={() => toggleFavorito(item.id)}
         style={[styles.itemContainer, esFavorito && styles.favorito]}
       >
-        <Image
-          source={item.imageLocal ? item.imageLocal : { uri: item.imageUri! }}
-          style={styles.itemImage}
-        />
+        {imageSource ? (
+          <Image source={imageSource} style={styles.itemImage} />
+        ) : (
+          <View style={[styles.itemImage, { backgroundColor: '#ccc' }]} />
+        )}
         <View style={styles.itemTextContainer}>
           <Text style={styles.itemTitulo}>{item.titulo}</Text>
           <Text style={styles.itemPrecio}>{item.precio}</Text>
@@ -98,14 +115,18 @@ const Index = () => {
           <View style={styles.modalContent}>
             {productoSeleccionado && (
               <>
-                <Image
-                  source={
-                    productoSeleccionado.imageLocal
-                      ? productoSeleccionado.imageLocal
-                      : { uri: productoSeleccionado.imageUri! }
-                  }
-                  style={[styles.modalImage, { resizeMode }]}
-                />
+                {productoSeleccionado.imageLocal || productoSeleccionado.imageUri ? (
+                  <Image
+                    source={
+                      productoSeleccionado.imageLocal
+                        ? productoSeleccionado.imageLocal
+                        : { uri: productoSeleccionado.imageUri! }
+                    }
+                    style={[styles.modalImage, { resizeMode }]}
+                  />
+                ) : (
+                  <View style={[styles.modalImage, { backgroundColor: '#ccc' }]} />
+                )}
                 <Text style={styles.modalTitulo}>{productoSeleccionado.titulo}</Text>
                 <Text style={styles.modalDescripcion}>{productoSeleccionado.descripcion}</Text>
 
@@ -133,7 +154,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5', paddingTop: 50 },
   input: { margin: 10, padding: 10, backgroundColor: 'white', borderRadius: 5 },
   lista: { paddingHorizontal: 10 },
-  itemContainer: { flexDirection: 'row', backgroundColor: 'white', marginVertical: 5, padding: 10, borderRadius: 5, alignItems: 'center' },
+  itemContainer: { flexDirection: 'row', backgroundColor: '#eef', marginVertical: 5, padding: 10, borderRadius: 5, alignItems: 'center' },
   itemTextContainer: { flex: 1, marginLeft: 10 },
   itemTitulo: { fontSize: 16, fontWeight: 'bold' },
   itemPrecio: { fontSize: 14, color: '#666' },
